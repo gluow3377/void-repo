@@ -1,0 +1,138 @@
+name: XBPS repository
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+  workflow_dispatch:
+    inputs:
+      rebuild:
+        description: Rebuild every package, ignoring what is already published
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  VOID_IMAGE: ghcr.io/void-linux/void-glibc-full:latest
+  SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    outputs:
+      ready: ${{ steps.build.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Download the published repository
+        if: ${{ !inputs.rebuild }}
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work "$VOID_IMAGE" \
+            sh .ci/fetch.sh "$SITE_URL/current" out/repo
+
+      - name: Build packages
+        id: build
+        run: |
+          docker run --rm --privileged \
+            -v "$PWD:/work" -w /work \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            "$VOID_IMAGE" sh -ec '
+              xbps-install -Syu xbps
+              xbps-install -yu
+              xbps-install -y bash git sudo
+              exec bash .ci/build.sh out
+            '
+          if [ -f out/ready ]; then
+            echo ready=true >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          list() { if [ -s "$1" ]; then sed 's/^/- /' "$1"; else echo "- none"; fi; }
+          {
+            echo "### Built"; list out/built
+            echo "### Failed"; list out/failed
+            echo "### Not published"; list out/skipped
+            echo "### Repository contents"
+            for f in out/repo/*.xbps; do
+              if [ -e "$f" ]; then echo "- ${f##*/}"; fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: steps.build.outputs.ready == 'true'
+        with:
+          name: repository
+          path: out/
+          retention-days: 7
+
+      - name: Fail if a package failed to build
+        run: |
+          if [ -s out/failed ]; then
+            echo "::error::Failed to build: $(paste -sd' ' out/failed)"
+            exit 1
+          fi
+
+  publish:
+    needs: build
+    if: ${{ !cancelled() && needs.build.outputs.ready == 'true' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: repository
+          path: out
+
+      - name: Sign
+        env:
+          XBPS_PRIVKEY: ${{ secrets.XBPS_PRIVKEY }}
+          XBPS_SIGNEDBY: ${{ vars.XBPS_SIGNEDBY || 'gluow3377 <344402541+gluow3377@users.noreply.github.com>' }}
+        run: |
+          if [ -z "$XBPS_PRIVKEY" ]; then
+            echo "::error::The XBPS_PRIVKEY secret is not set"
+            exit 1
+          fi
+          docker run --rm -v "$PWD:/work" -w /work \
+            -e XBPS_PRIVKEY -e XBPS_SIGNEDBY \
+            "$VOID_IMAGE" sh .ci/sign.sh out/repo
+          key=$(mktemp)
+          printf '%s\n' "$XBPS_PRIVKEY" > "$key"
+          fingerprint=$(ssh-keygen -l -E md5 -f "$key" | awk '{ print $2 }')
+          rm -f "$key"
+          echo "Signed by: $XBPS_SIGNEDBY, key fingerprint ${fingerprint#MD5:}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build the site
+        run: sh .ci/site.sh out/repo site "/${{ github.event.repository.name }}"
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+      - name: Verify
+        run: bash .ci/verify.sh "$SITE_URL" site

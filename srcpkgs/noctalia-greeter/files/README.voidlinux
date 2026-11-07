@@ -1,0 +1,49 @@
+Void-specific instructions:
+============================
+
+greetd runs its greeter as the _greeter user on Void. Point it at the session
+wrapper in /etc/greetd/config.toml:
+
+  [default_session]
+  command = "noctalia-greeter-session -- --session-wrapper dbus-run-session"
+  user = "_greeter"
+
+and restart greetd from a text console (this ends running sessions):
+
+  sv restart greetd
+
+Do not run /usr/share/noctalia-greeter/setup_greeter_system.sh or use the
+output of noctalia-greeter-print-greetd-config: Void's /etc/pam.d/greetd
+already gets pam_elogind from system-login, and Void's greetd uses vt = 7.
+
+Options after "--" are passed to the greeter:
+
+  --user NAME            open the password prompt for this user
+  --session NAME         preselect a session (see: noctalia-greeter sessions)
+  --session-wrapper CMD  start Wayland sessions through CMD (Void patch,
+                         same as the tuigreet option)
+
+Void's niri.desktop runs "/usr/bin/niri --session" without a D-Bus session bus,
+so keep --session-wrapper dbus-run-session, as with tuigreet.
+
+The greeter's compositor needs a seat: run elogind, or seatd with _greeter in
+the _seatd group:
+
+  usermod -aG _seatd _greeter
+
+Settings and state live in /var/lib/noctalia-greeter, owned by _greeter.
+Without /var/lib/noctalia-greeter/greeter.toml the defaults are used. Every key
+is described in /usr/share/examples/noctalia-greeter/greeter.toml; its values
+are only examples, so put just the keys you need into greeter.toml.
+The keyboard layout is not read from /etc/rc.conf; set it in greeter.toml:
+
+  [keyboard]
+  layout = "us,ru"
+  options = "grp:alt_shift_toggle"
+
+Logs go to syslog (socklog-void). To log to a file instead:
+
+  command = "env NOCTALIA_GREETER_LOG=/var/lib/noctalia-greeter/greeter.log noctalia-greeter-session -- --session-wrapper dbus-run-session"
+
+Optional packages: accountsservice (user avatars), polkit (appearance sync
+from Noctalia Shell), xinit (X11 sessions).

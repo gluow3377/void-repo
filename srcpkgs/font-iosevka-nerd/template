@@ -1,0 +1,23 @@
+# Template file for 'font-iosevka-nerd'
+pkgname=font-iosevka-nerd
+version=3.5.1
+revision=1
+archs="x86_64"
+depends="font-util"
+short_desc="Iosevka typeface patched with Nerd Fonts glyphs"
+maintainer="gluow3377 <344402541+gluow3377@users.noreply.github.com>"
+license="OFL-1.1"
+homepage="https://www.nerdfonts.com"
+changelog="https://raw.githubusercontent.com/ryanoasis/nerd-fonts/master/changelog.md"
+distfiles="https://github.com/ryanoasis/nerd-fonts/releases/download/v${version}/Iosevka.tar.xz"
+checksum=3b94ea1dc3955756762f977b7677bca671947dd56bc755a6f8465a8e83b5f257
+font_dirs="/usr/share/fonts/TTF"
+provides="font:monospace-0_1"
+
+do_install() {
+	for f in *.ttf; do
+		vinstall "${f}" 644 usr/share/fonts/TTF
+	done
+	vdoc README.md
+	vlicense LICENSE.md
+}

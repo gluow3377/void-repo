@@ -1,0 +1,13 @@
+Void-specific instructions:
+============================
+
+Each Minecraft version needs a specific Java version. Install the matching
+JRE and select it in the instance settings:
+
+  Minecraft 26.1 and newer      openjdk25-jre
+  Minecraft 1.20.5 - 1.21.x     openjdk21-jre
+  Minecraft 1.17 - 1.20.4       openjdk17-jre
+  Minecraft 1.16.5 and older    openjdk8-jre
+
+If you get an error message that includes "org.lwjgl.opengl.LinuxDisplay.getAvailableDisplayModes",
+you may need to install xrandr.

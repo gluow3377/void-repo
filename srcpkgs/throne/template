@@ -1,0 +1,60 @@
+# Template file for 'throne'
+pkgname=throne
+version=1.4.1
+revision=1
+archs="x86_64"
+build_style=cmake
+build_helper=go
+configure_args="-DINPUT_VERSION=${version} -DNKR_PACKAGE=ON
+ -DNKR_DESKTOP_EXEC=/usr/bin/throne"
+hostmakedepends="go lld pkg-config protobuf qt6-base qt6-tools"
+makedepends="libX11-devel qt6-base-devel qt6-tools-devel"
+depends="qt6-plugin-tls-openssl"
+short_desc="Cross-platform GUI proxy utility powered by sing-box"
+maintainer="gluow3377 <344402541+gluow3377@users.noreply.github.com>"
+license="GPL-3.0-or-later"
+homepage="https://throneproj.github.io"
+changelog="https://github.com/throneproj/Throne/releases"
+_srslist_commit=a9cd4d7e7e3e52f1cad8ff202c442ff2b40ae1e6
+distfiles="https://github.com/throneproj/Throne/archive/refs/tags/${version}.tar.gz
+ https://cdn.jsdelivr.net/gh/throneproj/routeprofiles@${_srslist_commit}/srslist.h"
+checksum="e202bf3d5d5f370680d6704a3710afa4d80d805a2e1193e49ada3d3883e82841
+ 52c60a622d911587caf95b136046dec561a8e07ad3f955d65562d666c98abe67"
+skip_extraction="srslist.h"
+
+_go_tags="with_clash_api,with_quic,with_wireguard,with_utls,with_dhcp,with_tailscale,with_openvpn,with_openconnect,badlinkname,tfogo_checklinkname0,with_naive_outbound"
+_protoc_gen_go_version=1.36.12
+_protoc_gen_go_grpc_version=1.6.2
+
+post_extract() {
+	vsrccopy srslist.h .
+}
+
+post_build() {
+	local _singbox_version
+
+	export GOFLAGS="-modcacherw"
+	export GOBIN="${wrksrc}/.gobin"
+	export PATH="${GOBIN}:${PATH}"
+	export CGO_LDFLAGS+=" -fuse-ld=lld"
+
+	cd core
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v${_protoc_gen_go_version}
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v${_protoc_gen_go_grpc_version}
+	(cd gen && protoc -I . --go_out=. --go-grpc_out=. libcore.proto)
+
+	_singbox_version=$(go list -m -f '{{.Version}}' github.com/sagernet/sing-box)
+	go build -p "$XBPS_MAKEJOBS" -v -trimpath -buildmode=pie -o ../build/ThroneCore \
+		-tags "${_go_tags}" \
+		-ldflags "-linkmode=external -checklinkname=0 -X 'github.com/sagernet/sing-box/constant.Version=${_singbox_version}' -X 'internal/godebug.defaultGODEBUG=multipathtcp=0'"
+}
+
+do_install() {
+	vinstall build/Throne 755 usr/lib/throne
+	vinstall build/ThroneCore 755 usr/lib/throne
+	vmkdir usr/bin
+	ln -s ../lib/throne/Throne ${DESTDIR}/usr/bin/throne
+
+	vinstall ${FILESDIR}/Throne.desktop 644 usr/share/applications
+	vinstall res/public/Throne.png 644 usr/share/icons/hicolor/512x512/apps throne.png
+}

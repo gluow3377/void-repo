@@ -1,0 +1,46 @@
+# Template file for 'ly'
+pkgname=ly
+version=1.5.0
+revision=1
+archs="x86_64"
+hostmakedepends="pkg-config"
+makedepends="libxcb-devel pam-devel"
+depends="brightnessctl xauth"
+short_desc="Lightweight TUI display manager"
+maintainer="gluow3377 <344402541+gluow3377@users.noreply.github.com>"
+license="WTFPL"
+homepage="https://codeberg.org/fairyglade/ly"
+changelog="https://codeberg.org/fairyglade/ly/releases"
+_zig_version=0.17.1
+distfiles="${homepage}/archive/v${version}.tar.gz
+ ${homepage}/releases/download/v${version}/vendor.tar.zst
+ https://ziglang.org/download/${_zig_version}/zig-x86_64-linux-${_zig_version}.tar.xz"
+checksum="115a7f7fb281803ca7f9e0ddbdf76834a53f7fa6bc702d766d03772ce1976dc3
+ cdf04c3d5cd0e4ae4eaf37cba0627b708558f779f36ba4512140f2b573e64217
+ 3581863e3cbcfd0fce0efc682ce7e9e93da96668a977791d356a26d2a7e9b17a"
+skip_extraction="vendor.tar.zst zig-x86_64-linux-${_zig_version}.tar.xz"
+conf_files="/etc/ly/config.ini /etc/ly/startup.sh /etc/pam.d/ly
+ /etc/pam.d/ly-autologin /etc/sv/ly/conf"
+
+post_extract() {
+	vsrcextract --no-strip-components vendor.tar.zst
+	vsrcextract -C zig zig-x86_64-linux-${_zig_version}.tar.xz
+}
+
+post_patch() {
+	vsed -i build.zig -e '/b.installArtifact(exe);/i \    exe.pie = true;'
+}
+
+_zig_build() {
+	"${wrksrc}/zig/zig" build ${makejobs} --release=safe -Dcpu=baseline \
+		-Dinit_system=runit "$@"
+}
+
+do_build() {
+	_zig_build
+}
+
+do_install() {
+	_zig_build installexe -Ddest_directory="${DESTDIR}"
+	vlicense license.md
+}

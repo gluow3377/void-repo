@@ -1,0 +1,23 @@
+# Template file for 'font-jetbrains-mono-nerd'
+pkgname=font-jetbrains-mono-nerd
+version=3.5.1
+revision=1
+archs="x86_64"
+depends="font-util"
+short_desc="JetBrains Mono typeface patched with Nerd Fonts glyphs"
+maintainer="gluow3377 <344402541+gluow3377@users.noreply.github.com>"
+license="OFL-1.1"
+homepage="https://www.nerdfonts.com"
+changelog="https://raw.githubusercontent.com/ryanoasis/nerd-fonts/master/changelog.md"
+distfiles="https://github.com/ryanoasis/nerd-fonts/releases/download/v${version}/JetBrainsMono.tar.xz"
+checksum=04d5e8f903693f9dd13e16f867e994834e681eb3c72c0d337a770dcda09010cf
+font_dirs="/usr/share/fonts/TTF"
+provides="font:monospace-0_1"
+
+do_install() {
+	for f in *.ttf; do
+		vinstall "${f}" 644 usr/share/fonts/TTF
+	done
+	vdoc README.md
+	vlicense OFL.txt
+}

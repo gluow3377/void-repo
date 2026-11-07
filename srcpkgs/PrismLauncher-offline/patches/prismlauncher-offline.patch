@@ -1,0 +1,121 @@
+From 456ec05b33782006287bbf9e75a632adb243b0db Mon Sep 17 00:00:00 2001
+From: gluow3377 <344402541+gluow3377@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 16:09:27 +0700
+Subject: [PATCH] feat: allow offline accounts without a Microsoft account
+
+Offline accounts can now be added and used to play without a Microsoft
+account that owns Minecraft:
+
+- "Add Offline" no longer requires a Microsoft account
+- offline accounts count as valid accounts, so the "No Accounts" prompt,
+  the setup wizard login page and "Download All" accept them
+- launching with an offline account no longer falls back to demo mode:
+  "Launch" downloads/updates the game as usual, "Launch Offline" skips
+  the network
+- texts saying a Microsoft account is required were updated
+---
+ launcher/LaunchController.cpp                |  9 +++++++--
+ launcher/minecraft/auth/AccountList.cpp      |  2 +-
+ launcher/ui/pages/global/AccountListPage.cpp | 11 ++---------
+ launcher/ui/pages/instance/VersionPage.cpp   |  2 +-
+ launcher/ui/setupwizard/LoginWizardPage.ui   |  2 +-
+ 5 files changed, 12 insertions(+), 14 deletions(-)
+
+diff --git a/launcher/LaunchController.cpp b/launcher/LaunchController.cpp
+index 2b88233..1da0362 100644
+--- a/launcher/LaunchController.cpp
++++ b/launcher/LaunchController.cpp
+@@ -95,8 +95,8 @@ void LaunchController::decideAccount()
+     if (!accounts->anyAccountIsValid()) {
+         // Tell the user they need to log in at least one account in order to play.
+         auto reply = CustomMessageBox::selectable(m_parentWidget, tr("No Accounts"),
+-                                                  tr("In order to play Minecraft, you must have at least one Microsoft "
+-                                                     "account which owns Minecraft logged in. "
++                                                  tr("In order to play Minecraft, you must add at least one account: "
++                                                     "an offline account (just a player name) or a Microsoft account. "
+                                                      "Would you like to open the account manager to add an account now?"),
+                                                   QMessageBox::Information, QMessageBox::Yes | QMessageBox::No)
+                          ->exec();
+@@ -134,6 +134,11 @@ LaunchDecision LaunchController::decideLaunchMode()
+         return LaunchDecision::Continue;
+     }
+ 
++    if (m_accountToUse->accountType() == AccountType::Offline) {
++        m_actualLaunchMode = m_wantedLaunchMode == LaunchMode::Offline ? LaunchMode::Offline : LaunchMode::Normal;
++        return LaunchDecision::Continue;
++    }
++
+     const auto* accounts = APPLICATION->accounts();
+     MinecraftAccountPtr accountToCheck = nullptr;
+ 
+diff --git a/launcher/minecraft/auth/AccountList.cpp b/launcher/minecraft/auth/AccountList.cpp
+index 418ba98..e7bdbd2 100644
+--- a/launcher/minecraft/auth/AccountList.cpp
++++ b/launcher/minecraft/auth/AccountList.cpp
+@@ -592,7 +592,7 @@ void AccountList::setListFilePath(QString path, bool autosave)
+ bool AccountList::anyAccountIsValid()
+ {
+     for (auto account : m_accounts) {
+-        if (account->ownsMinecraft()) {
++        if (account->ownsMinecraft() || account->accountType() == AccountType::Offline) {
+             return true;
+         }
+     }
+diff --git a/launcher/ui/pages/global/AccountListPage.cpp b/launcher/ui/pages/global/AccountListPage.cpp
+index 06c40f1..d1a76b2 100644
+--- a/launcher/ui/pages/global/AccountListPage.cpp
++++ b/launcher/ui/pages/global/AccountListPage.cpp
+@@ -55,7 +55,8 @@ AccountListPage::AccountListPage(QWidget* parent) : QMainWindow(parent), ui(new
+     ui->setupUi(this);
+     ui->listView->setEmptyString(
+         tr("Welcome!\n"
+-           "If you're new here, you can select the \"Add Microsoft\" button to link your Microsoft account."));
++           "To play without a Microsoft account, select the \"Add Offline\" button and enter a player name.\n"
++           "To link your Microsoft account, select the \"Add Microsoft\" button."));
+     ui->listView->setEmptyMode(VersionListView::String);
+     ui->listView->setContextMenuPolicy(Qt::CustomContextMenu);
+ 
+@@ -140,14 +141,6 @@ void AccountListPage::on_actionAddMicrosoft_triggered()
+ 
+ void AccountListPage::on_actionAddOffline_triggered()
+ {
+-    if (!m_accounts->anyAccountIsValid()) {
+-        QMessageBox::warning(this, tr("Error"),
+-                             tr("You must add a Microsoft account that owns Minecraft before you can add an offline account."
+-                                "<br><br>"
+-                                "If you have lost your account you can contact Microsoft for support."));
+-        return;
+-    }
+-
+     ChooseOfflineNameDialog dialog(tr("Please enter your desired username to add your offline account."), this);
+     if (dialog.exec() != QDialog::Accepted) {
+         return;
+diff --git a/launcher/ui/pages/instance/VersionPage.cpp b/launcher/ui/pages/instance/VersionPage.cpp
+index fea759b..bbc9ced 100644
+--- a/launcher/ui/pages/instance/VersionPage.cpp
++++ b/launcher/ui/pages/instance/VersionPage.cpp
+@@ -425,7 +425,7 @@ void VersionPage::on_actionDownload_All_triggered()
+     if (!APPLICATION->accounts()->anyAccountIsValid()) {
+         CustomMessageBox::selectable(this, tr("Error"),
+                                      tr("Cannot download Minecraft or update instances unless you have at least "
+-                                        "one account added.\nPlease add a Microsoft account."),
++                                        "one account added.\nPlease add an offline or Microsoft account."),
+                                      QMessageBox::Warning)
+             ->show();
+         return;
+diff --git a/launcher/ui/setupwizard/LoginWizardPage.ui b/launcher/ui/setupwizard/LoginWizardPage.ui
+index 191316c..65fef41 100644
+--- a/launcher/ui/setupwizard/LoginWizardPage.ui
++++ b/launcher/ui/setupwizard/LoginWizardPage.ui
+@@ -30,7 +30,7 @@
+    <item>
+     <widget class="QLabel" name="label_2">
+      <property name="text">
+-      <string>In order to play Minecraft, you must have at least one Microsoft account logged in. Do you want to log in now?</string>
++      <string>You can log in with a Microsoft account now, or skip this step and play offline: add an offline account (just a player name) later in Accounts → Manage Accounts... → Add Offline.</string>
+      </property>
+      <property name="wordWrap">
+       <bool>true</bool>
+-- 
+2.43.0
+

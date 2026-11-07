@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-obsidian-canvas">
+    <comment>Obsidian Canvas</comment>
+    <glob pattern="*.canvas"/>
+    <generic-icon name="x-office-document"/>
+  </mime-type>
+  <mime-type type="application/x-obsidian-base">
+    <comment>Obsidian Base</comment>
+    <glob pattern="*.base"/>
+    <generic-icon name="x-office-document"/>
+  </mime-type>
+</mime-info>

@@ -1,0 +1,97 @@
+diff --git a/src/greeter/greeter_sessions.cpp b/src/greeter/greeter_sessions.cpp
+index fa5f17e..7225caa 100644
+--- a/src/greeter/greeter_sessions.cpp
++++ b/src/greeter/greeter_sessions.cpp
+@@ -37,6 +37,8 @@ namespace {
+     return trim(out);
+   }
+ 
++  std::vector<std::string> g_sessionWrapper;
++
+   [[nodiscard]] bool equalsIgnoreCase(std::string_view a, std::string_view b) {
+     if (a.size() != b.size()) {
+       return false;
+@@ -281,7 +283,17 @@ namespace greeter {
+       return wrapped;
+     }
+ 
++    tokens.insert(tokens.begin(), g_sessionWrapper.begin(), g_sessionWrapper.end());
+     return tokens;
+   }
+ 
++  void setSessionWrapper(std::string_view wrapper) {
++    g_sessionWrapper.clear();
++    std::istringstream stream{std::string(wrapper)};
++    std::string token;
++    while (stream >> token) {
++      g_sessionWrapper.push_back(token);
++    }
++  }
++
+ } // namespace greeter
+diff --git a/src/greeter/greeter_sessions.h b/src/greeter/greeter_sessions.h
+index 870e504..a968f8f 100644
+--- a/src/greeter/greeter_sessions.h
++++ b/src/greeter/greeter_sessions.h
+@@ -38,4 +38,6 @@ namespace greeter {
+   // (which need Xorg bootstrapped first). Empty when Exec= is empty or whitespace-only.
+   [[nodiscard]] std::vector<std::string> sessionArgv(const SessionOption& session);
+ 
++  void setSessionWrapper(std::string_view wrapper);
++
+ } // namespace greeter
+diff --git a/src/main.cpp b/src/main.cpp
+index 0ac8d22..53d0d13 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -147,6 +147,14 @@ int main(int argc, char* argv[]) {
+       greeter::setCliDefaultUser(argv[++i]);
+       continue;
+     }
++    if (std::strcmp(argv[i], "--session-wrapper") == 0) {
++      if (i + 1 >= argc) {
++        std::fputs("error: --session-wrapper requires a command\n", stderr);
++        return 1;
++      }
++      greeter::setSessionWrapper(argv[++i]);
++      continue;
++    }
+     if (std::strcmp(argv[i], "--version") == 0 || std::strcmp(argv[i], "-v") == 0) {
+       std::printf("noctalia-greeter %s\n", NOCTALIA_GREETER_VERSION);
+       return 0;
+@@ -184,6 +192,7 @@ int main(int argc, char* argv[]) {
+           "  --log-test            Write test lines to all log paths and exit\n"
+           "  --session, --cmd NAME Default session (.desktop Name= or filename)\n"
+           "  --user NAME           Default user (skip user picker, open password)\n"
++          "  --session-wrapper CMD Run non-X11 sessions through CMD (e.g. dbus-run-session)\n"
+           "\n"
+           "Environment:\n"
+           "  GREETD_SOCK           Path to greetd Unix socket\n"
+diff --git a/tests/session_discovery_test.cpp b/tests/session_discovery_test.cpp
+index d646db2..c416079 100644
+--- a/tests/session_discovery_test.cpp
++++ b/tests/session_discovery_test.cpp
+@@ -109,6 +109,23 @@ namespace {
+ 
+     const greeter::SessionOption empty{.name = "Empty", .command = "  ", .desktopNames = {}, .sessionType = "wayland"};
+     expect(greeter::sessionArgv(empty).empty(), "whitespace-only Exec= yields empty argv");
++
++    greeter::setSessionWrapper("dbus-run-session");
++    expectArgv(greeter::sessionArgv(wayland), {"dbus-run-session", "niri"}, "wayland session argv is wrapped");
++    expectArgv(greeter::sessionArgv(tty), {"dbus-run-session", "/bin/sh"}, "tty fallback session argv is wrapped");
++    expectArgv(
++        greeter::sessionArgv(x11), {"noctalia-greeter-xsession", "/usr/bin/bspwm"},
++        "x11 session argv ignores the session wrapper"
++    );
++    expect(greeter::sessionArgv(empty).empty(), "whitespace-only Exec= stays empty with a session wrapper");
++
++    greeter::setSessionWrapper(" env  FOO=1 ");
++    expectArgv(
++        greeter::sessionArgv(wayland), {"env", "FOO=1", "niri"}, "multi-token session wrapper splits correctly"
++    );
++
++    greeter::setSessionWrapper("");
++    expectArgv(greeter::sessionArgv(wayland), {"niri"}, "empty session wrapper disables wrapping");
+   }
+ 
+ } // namespace

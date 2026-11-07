@@ -1,0 +1,31 @@
+# Template file for 'font-times-new-roman'
+pkgname=font-times-new-roman
+version=2.82
+revision=1
+archs="x86_64"
+depends="font-util"
+short_desc="Times New Roman typeface from Microsoft core fonts"
+maintainer="gluow3377 <344402541+gluow3377@users.noreply.github.com>"
+license="custom:MFLA"
+homepage="https://corefonts.sourceforge.net"
+distfiles="${SOURCEFORGE_SITE}/corefonts/times32.exe
+ ${SOURCEFORGE_SITE}/corefonts/webdin32.exe"
+checksum="db56595ec6ef5d3de5c24994f001f03b2a13e37cee27bc25c58f6f43e8f807ab
+ 64595b5abc1080fba8610c5c34fab5863408e806aafe84653ca8575bed17d75a"
+conflicts="msttcorefonts"
+provides="font:serif-0_1"
+font_dirs="/usr/share/fonts/TTF"
+restricted=yes
+repository=nonfree
+
+do_extract() {
+	bsdtar -xf ${XBPS_SRCDISTDIR}/${pkgname}-${version}/times32.exe
+	bsdtar -xf ${XBPS_SRCDISTDIR}/${pkgname}-${version}/webdin32.exe Licen.TXT
+}
+
+do_install() {
+	for f in *.TTF; do
+		vinstall "${f}" 644 usr/share/fonts/TTF
+	done
+	vlicense Licen.TXT
+}

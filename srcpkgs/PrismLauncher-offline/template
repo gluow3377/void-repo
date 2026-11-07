@@ -1,0 +1,32 @@
+# Template file for 'PrismLauncher-offline'
+pkgname=PrismLauncher-offline
+version=11.1.1
+revision=1
+archs="x86_64"
+build_style=cmake
+configure_args="-DLauncher_BUILD_PLATFORM=Void"
+hostmakedepends="extra-cmake-modules openjdk17 pkg-config qt6-tools qt6-base scdoc"
+makedepends="qt6-base-devel qt6-qt5compat-devel zlib-devel quazip-qt6-devel
+ qt6-networkauth-devel cmark-devel libgamemode-devel qrencode-devel
+ libarchive-devel tomlplusplus-devel"
+depends="virtual?java-runtime qt6-svg qt6-imageformats qt6-plugin-tls-openssl"
+short_desc="Custom launcher for Minecraft"
+maintainer="gluow3377 <344402541+gluow3377@users.noreply.github.com>"
+license="GPL-3.0-only"
+homepage="https://prismlauncher.org/"
+distfiles="https://github.com/PrismLauncher/PrismLauncher/releases/download/${version}/PrismLauncher-${version}.tar.gz"
+checksum=9ea53f93714cd2a59dc0f38153690a59a3f06f439934d1410ec364cc7f363eb5
+replaces="PrismLauncher>=0"
+conflicts="PrismLauncher>=0"
+
+if [ -z "$XBPS_CHECK_PKGS" ]; then
+	configure_args+=" -DBUILD_TESTING=0"
+fi
+
+pre_configure() {
+	. /etc/profile.d/jdk.sh
+}
+
+post_install() {
+	vdoc ${FILESDIR}/README.voidlinux
+}
